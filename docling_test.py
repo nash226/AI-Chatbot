@@ -1,6 +1,6 @@
 from docling.document_converter import DocumentConverter
 
-source = "https://blog.mozilla.org/press-br/files/2013/10/Mozilla-Firefox_ReviewersGuide-FINAL-April-2014.pdf"
+source = "https://dn721906.ca.archive.org/0/items/manualzilla-id-5645659/5645659.pdf"
 converter = DocumentConverter()
 doc = converter.convert(source).document
 
