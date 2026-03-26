@@ -5,33 +5,20 @@ from pinecone import Pinecone
 
 load_dotenv()
 llm = OpenAI()
-pc = Pinecone(api_key = os.getenv('PINECONE_API_KEY'))
-dense_index = pc.Index('gross-app')
+pc = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
+dense_index = pc.Index("gross-app")
 
-
-assistant_message = "How can I help you today?"
-print(f"Assistant: {assistant_message}\n")
-user_input = input("User: ")
-
-history = [
-    {"role": "developer", "content": """You are an AI customer support
-    technician who is knowledgeable about software products created by
-    the company called GROSS. One such product is a web browser called Flamehamster."""},
-    {"role": "assistant", "content": assistant_message}
-]
-
-while user_input != "exit":
-    # RAG Step #1: Retrieve relevant chunks from vector DB:
-    namespace="flamehamster",
+def rag(user_input):
     results = dense_index.search(
-        query={
-            "top_k": 3,
-            "inputs": {
-                'text': user_input
-            }
+    namespace="all-gross",
+    query={
+        "top_k": 3,
+        "inputs": {
+        'text': user_input
         }
-    )
-    # RAG Step #2: Convert chunks into one long string of documentation
+    }
+)
+    
     documentation = ""
 
     for hit in results['result']['hits']:
@@ -39,23 +26,49 @@ while user_input != "exit":
         chunk_text = fields.get('chunk_text')
         documentation += chunk_text
 
-    # RAG Step #3: Insert retrieved documentation into prompt
-    history += [
-        {"role": "user",
-        "content": f"""Here are excerpts from the official Flamehamster
-        web browser documentation: {documentation}. Use whatever
-        info from the above documentation excerpts (and no other info)
-        to answer the following query: {user_input}"""}
-    ]
+    return documentation
 
+def system_prompt():
+    return {"role": "developer", "content": """You are an AI customer support
+    technician who is knowledgeable about software products created by
+    the company called GROSS. The products are:
+    * Flamehamster, a web browser.
+    * Rumblechirp, an email client.
+    * GuineaPigment, a drawing tool for creating/editing SVGs
+    * EMRgency, an electronic medical record system
+    * Verbiage++, a content management system."""}
+
+def user_prompt(user_input, documentation):
+    return {"role": "user",
+            "content": f"""Here are excerpts from the official GROSS product
+            documentation: {documentation}. Use whatever
+            info from the above documentation excerpts (and no other info)
+            to answer the following query: {user_input}"""
+    }
+
+def llm_response(prompt):
     response = llm.responses.create(
         model="gpt-4.1-mini",
         temperature=0,
-        input=history
+        input=prompt
     )
+    return response
 
-    print(f"\nAssistant: {response.output_text}\n")
-    history += [
-        {"role": "assistant", "content": response.output_text},
-    ]
+if __name__ == "__main__":
+    print(f"Assistant: How can I help you today?\n")
     user_input = input("User: ")
+    history = [
+        system_prompt(),
+        {"role": "assistant", "content": "How can I help you today?"}
+    ]
+
+    while user_input != "exit":
+        documentation = rag(user_input)
+        history += [user_prompt(user_input, documentation)]
+        response = llm_response(history)
+        print(f"\nAssistant: {response.output_text}\n")
+
+        history += [
+            {"role": "assistant", "content": response.output_text},
+        ]
+        user_input = input("User: ")
